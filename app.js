@@ -5,7 +5,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get("/health", (req, res) => {
-  res.status(200).send("OK");
+  res.status(200).send("OK v0.2");
 });
 
 if (require.main === module) {

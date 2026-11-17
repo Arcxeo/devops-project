@@ -122,3 +122,23 @@ Question 5. How does this pattern help with hybrid or multi-cloud deployments? W
 > The base keeps the application configuration the same everywhere, while each overlay contains only the changes needed for one target. This avoids maintaining three copies of the same Deployment and Service.
 >
 > In a real setup, the overlays could select different StorageClasses, ingress settings or cloud load balancers. An on-prem cluster would use the storage, network and registry available in the local infrastructure, while a cloud cluster would usually use services provided by that cloud. Credentials and cluster access would also be managed separately.
+
+## Part 5 - Rolling update and rollback
+
+For version `0.2`, `/health` returns `OK v0.2`. We built the new image, loaded it into kind and changed the `dev` overlay from `myapp:0.1` to `myapp:0.2`. Requests continued to succeed while Kubernetes replaced the Pod.
+
+We then applied the nonexistent tag `myapp:broken` on purpose. The new Pod stayed in `ImagePullBackOff`, while the previous `0.2` Pod continued serving traffic. `kubectl rollout undo` restored the Deployment.
+
+Commands used during the test:
+
+```sh
+docker build -t myapp:0.2 .
+kind load docker-image myapp:0.2 --name devops-lab
+kubectl apply -k k8s/overlays/dev
+kubectl rollout status deployment/myapp -n dev
+kubectl rollout history deployment/myapp -n dev
+kubectl rollout undo deployment/myapp -n dev
+```
+
+Question 6. Why did the broken rollout not take down the application?
+> The Deployment uses the `RollingUpdate` strategy. Kubernetes waits for the new Pod to become ready before removing the old one. The Pod using the broken image never became ready, so the existing `0.2` Pod stayed in the Service and kept answering requests. Kubernetes did not fix the bad image automatically; we still had to roll back the Deployment.
