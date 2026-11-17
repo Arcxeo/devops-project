@@ -142,3 +142,41 @@ kubectl rollout undo deployment/myapp -n dev
 
 Question 6. Why did the broken rollout not take down the application?
 > The Deployment uses the `RollingUpdate` strategy. Kubernetes waits for the new Pod to become ready before removing the old one. The Pod using the broken image never became ready, so the existing `0.2` Pod stayed in the Service and kept answering requests. Kubernetes did not fix the bad image automatically; we still had to roll back the Deployment.
+
+## Part 6 - Audit and traceability
+
+The `prod` Deployment has annotations for the Git commit, the GitHub Actions run, the owner and the ticket. The RBAC manifests in `k8s/rbac/` create a `viewer` ServiceAccount that can only read Pods in `dev`.
+
+```sh
+kubectl apply -k k8s/overlays/prod
+kubectl get events -n prod --sort-by=.metadata.creationTimestamp
+kubectl describe deployment myapp -n prod
+kubectl apply -k k8s/rbac
+kubectl auth can-i list pods -n dev --as=system:serviceaccount:dev:viewer
+kubectl auth can-i delete pods -n dev --as=system:serviceaccount:dev:viewer
+```
+
+Observed RBAC results:
+
+```text
+list pods:    yes
+get pods:     yes
+delete pods:  no
+list secrets: no
+```
+
+The production trace used in this lab is:
+
+```text
+Pod -> ReplicaSet -> Deployment
+commit: 73637f31c7329ec4d91521f7cfd72e8a838f2771
+pipeline: https://github.com/Arcxeo/devops-project/actions/runs/44121519990
+owner: team-a
+ticket: OPS-123
+```
+
+Question 7. Starting from a Pod running in production, how can you find the commit, the reviewer and the pipeline run that produced it?
+> First, follow the Pod's `ownerReferences` to its ReplicaSet, then from the ReplicaSet to the Deployment. The Deployment annotations give us the commit SHA and the pipeline URL. We can open that commit on GitHub, find its Pull Request and check the review section to see who approved it.
+
+Question 8. Why is manual `kubectl edit` in production a traceability risk?
+> A manual edit changes the cluster without changing the files in Git. There is no Pull Request, review or CI run explaining the change, and the next deployment can overwrite it. Using manifests through the normal Git workflow leaves a history of who changed what and why.

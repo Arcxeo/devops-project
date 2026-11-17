@@ -28,3 +28,14 @@ patches:
       - op: replace
         path: /data/APP_ENV
         value: prod
+  - target:
+      kind: Deployment
+      name: myapp
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          git-commit: "73637f31c7329ec4d91521f7cfd72e8a838f2771"
+          pipeline-run-url: "https://github.com/Arcxeo/devops-project/actions/runs/44121519990"
+          owner: "team-a"
+          ticket: "OPS-123"
