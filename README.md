@@ -35,3 +35,13 @@ Question 2. What is the difference between an image and a container?
 
 Question 3. Compare the size of your image with a non-slim base image. What do you observe?
 > On this machine, `docker image ls myapp` reports about 252 MB for `myapp:0.1` (Alpine) and 1.64 GB for `myapp:0.1-standard` (`node:24`), so the standard image is approximately 6.5 times larger. Exact values can vary by Docker version and platform. The standard image contains a full Linux userland and more system tools, while Alpine keeps only a minimal set of packages. This reduces download time, storage use, and the potential attack surface, although Alpine can sometimes require extra compatibility work for native dependencies.
+
+## Part 3 - CI Pipeline
+
+The GitHub Actions workflow installs dependencies, runs lint and tests, and builds the Docker image for every pull request. After a successful push to `main`, it also publishes the image to GitHub Container Registry with the commit SHA as its tag.
+
+Question 4. Why tag the image with the commit SHA rather than `latest`?
+> A commit SHA is immutable and uniquely identifies the exact source code used to build an image. It makes deployments reproducible and provides direct traceability from an image back to its commit and pipeline run. The `latest` tag is mutable, ambiguous, and can point to a different image over time.
+
+Question 5. What does "fail fast" mean in a pipeline?
+> Fail fast means running quick checks early and stopping the pipeline as soon as one fails. This gives developers rapid feedback and avoids spending time and resources on later steps, such as building or publishing an image, when the code is already known to be invalid.
