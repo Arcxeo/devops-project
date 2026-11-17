@@ -12,7 +12,7 @@ replicas:
 
 images:
   - name: myapp
-    newTag: "0.1"
+    newTag: "0.2"
 
 labels:
   - pairs:

@@ -3,7 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const app = require("../app");
 
-test("GET /health returns 200 and OK", async () => {
+test("GET /health returns 200 and OK v0.2", async () => {
   const server = app.listen(0);
 
   try {
@@ -15,7 +15,7 @@ test("GET /health returns 200 and OK", async () => {
     const body = await response.text();
 
     assert.equal(response.status, 200);
-    assert.equal(body, "OK");
+    assert.equal(body, "OK v0.2");
   } finally {
     server.close();
   }
