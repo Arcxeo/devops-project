@@ -45,3 +45,12 @@ Question 4. Why tag the image with the commit SHA rather than `latest`?
 
 Question 5. What does "fail fast" mean in a pipeline?
 > Fail fast means running quick checks early and stopping the pipeline as soon as one fails. This gives developers rapid feedback and avoids spending time and resources on later steps, such as building or publishing an image, when the code is already known to be invalid.
+
+# Session 2: Kubernetes, Multi-environment Deployment and Audit
+
+## Part 1 - Local Cluster Setup
+
+Question 1. What is the role of a namespace? Does it provide strong security isolation by itself?
+> A namespace is a logical partition inside a Kubernetes cluster. It groups namespaced resources such as Pods, Deployments, Services, ConfigMaps, and Secrets. Namespaces help organize workloads by team or environment, avoid naming conflicts, scope RBAC permissions and quotas, and make resources easier to manage.
+>
+> A namespace does not provide strong security isolation by itself. Workloads in different namespaces still share the same cluster, nodes, kernel, and network by default. Stronger isolation requires complementary controls such as RBAC, NetworkPolicies, Pod Security Admission, resource quotas, separate service accounts, admission policies, and, for stricter trust boundaries, separate clusters.
