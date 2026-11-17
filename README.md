@@ -7,6 +7,8 @@
 - Nicolas Papleux
 - Romain Dangin
 
+We used some IA to guide us for the labs.
+
 # Session 1: Git, CI/CD and Docker
 
 ## Part 1 - Git repository and branching workflow
