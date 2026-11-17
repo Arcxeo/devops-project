@@ -101,3 +101,24 @@ Question 3. What is the difference between a readiness and a liveness probe? Wha
 
 Question 4. Is a Kubernetes Secret encrypted by default? How would you improve this?
 > No. The value stored in a Secret manifest is only base64-encoded, not encrypted. Secrets can also be stored unencrypted in etcd unless encryption at rest is configured. We would enable etcd encryption, restrict access with RBAC and, for a real production setup, use an external secret manager instead of keeping secret values in Git.
+
+## Part 4 - Multiple environments with Kustomize
+
+The files in `k8s/base/` contain the common configuration. Each folder in `k8s/overlays/` changes the namespace, the `env` label, `APP_ENV` and the replica count. We use one replica in `dev`, three in `staging` and five in `prod`.
+
+Commands used to preview and deploy the overlays:
+
+```sh
+kubectl kustomize k8s/overlays/dev
+kubectl kustomize k8s/overlays/staging
+kubectl kustomize k8s/overlays/prod
+kubectl apply -k k8s/overlays/dev
+kubectl apply -k k8s/overlays/staging
+kubectl apply -k k8s/overlays/prod
+kubectl get deployment -A -l app=myapp
+```
+
+Question 5. How does this pattern help with hybrid or multi-cloud deployments? What would differ between a real on-prem cluster and a cloud cluster?
+> The base keeps the application configuration the same everywhere, while each overlay contains only the changes needed for one target. This avoids maintaining three copies of the same Deployment and Service.
+>
+> In a real setup, the overlays could select different StorageClasses, ingress settings or cloud load balancers. An on-prem cluster would use the storage, network and registry available in the local infrastructure, while a cloud cluster would usually use services provided by that cloud. Credentials and cluster access would also be managed separately.
