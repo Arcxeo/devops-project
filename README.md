@@ -91,3 +91,13 @@ curl http://localhost:8080/health
 
 Question 2. Why does Kubernetes recreate the deleted Pod? Which component is responsible?
 > The Deployment says that three replicas must be running. When a Pod is deleted, the ReplicaSet sees that only two are left and creates a replacement. The ReplicaSet controller, running in `kube-controller-manager`, handles this reconciliation. The new Pod has a different name because it is a new object.
+
+## Part 3 - Probes, resources and configuration
+
+The Deployment now checks `/health` with readiness and liveness probes. It also defines CPU and memory requests and limits. `APP_ENV` comes from `myapp-config`, while the fake `API_KEY` comes from `myapp-secret`.
+
+Question 3. What is the difference between a readiness and a liveness probe? What happens to traffic when readiness fails?
+> Readiness tells Kubernetes whether a Pod can receive traffic. When it fails, the Pod keeps running but the Service removes it from its endpoints. Liveness checks whether the application is stuck or unhealthy. When liveness fails several times, Kubernetes restarts the container.
+
+Question 4. Is a Kubernetes Secret encrypted by default? How would you improve this?
+> No. The value stored in a Secret manifest is only base64-encoded, not encrypted. Secrets can also be stored unencrypted in etcd unless encryption at rest is configured. We would enable etcd encryption, restrict access with RBAC and, for a real production setup, use an external secret manager instead of keeping secret values in Git.
