@@ -15,7 +15,8 @@ test("GET /health returns 200 and OK", async () => {
     const body = await response.text();
 
     assert.equal(response.status, 200);
-    assert.equal(body, "OK");
+    // Intentional failure for the CI pipeline demonstration.
+    assert.equal(body, "NOT_OK");
   } finally {
     server.close();
   }
