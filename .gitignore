@@ -9,3 +9,9 @@ coverage/
 # Terraform local data
 .terraform/
 *.tfstate*
+
+# Only the public lab inputs are tracked
+*.tfvars
+*.tfvars.json
+!/infra/envs/dev/dev.tfvars
+!/infra/envs/staging/staging.tfvars
