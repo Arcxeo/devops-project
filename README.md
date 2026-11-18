@@ -228,3 +228,15 @@ Provider-managed resource attributes can include passwords, API tokens,
 connection strings, private addresses and identifiers. Terraform's sensitive
 flag masks values in normal terminal output, but the values can still exist
 in state and saved plan files.
+
+## Part 4 - Ephemeral Environment per Pull Request
+
+### 6. What could go wrong if the preview environment is never destroyed? List three mitigations.
+
+A stale preview consumes cluster capacity, can expose an outdated build and
+can leave resources behind after the PR no longer needs them. Three
+mitigations are:
+
+1. Trigger destruction when a PR closes or merges.
+2. Set an expiration label and run a scheduled cleanup for expired namespaces.
+3. Give each preview an owner and enforce resource quotas to limit its impact.
