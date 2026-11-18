@@ -75,3 +75,90 @@ terraform plan -var-file=dev.tfvars
 + external = 8083
 Plan: 1 to add, 0 to change, 0 to destroy.
 ~~~
+
+## Kubernetes previews
+
+Use the local kind cluster and build the image from the repository.
+
+```sh
+kind create cluster --name devops-lab
+docker build -t myapp:lab3-preview .
+kind load docker-image myapp:lab3-preview --name devops-lab
+```
+
+Run one Terraform backend and one Terraform data directory per PR. The
+following shell commands use an expiration date one day after creation.
+For PowerShell, set the same variables with `$env:TF_DATA_DIR` and use
+`(Get-Location).Path` to build the absolute path.
+
+```sh
+expires=2026-11-19
+
+preview() {
+  pr="$1"
+  shift
+  TF_DATA_DIR="$PWD/infra/preview/.terraform/pr-$pr" \
+    terraform -chdir=infra/preview "$@"
+}
+
+for pr in 42 43; do
+  preview "$pr" init -backend-config="path=state/pr-$pr.tfstate"
+  preview "$pr" apply -var="pr_number=$pr" -var=image=myapp:lab3-preview \
+    -var=owner=team-a -var="expires=$expires"
+  kubectl --context kind-devops-lab -n "pr-$pr" rollout status deployment/myapp
+  kubectl --context kind-devops-lab -n "pr-$pr" get deployment,pod,service
+done
+
+preview 42 destroy -var=pr_number=42 -var=image=myapp:lab3-preview \
+  -var=owner=team-a -var="expires=$expires"
+kubectl --context kind-devops-lab get namespace pr-42 --ignore-not-found -o name
+kubectl --context kind-devops-lab -n pr-43 get deployment,pod,service
+```
+
+Namespaces scope each preview's Deployment and Service. The `owner` and
+`expires` labels provide metadata for cleanup tooling. Cleanup in this
+exercise is performed with `terraform destroy`.
+
+### Observed preview verification
+
+Selected output before destroying PR 42:
+
+~~~text
+NAME    STATUS   AGE   OWNER    EXPIRES
+pr-42   Active   83s   team-a   2026-11-19
+NAME                    READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/myapp   1/1     1            1           83s
+
+NAME                         READY   STATUS    RESTARTS   AGE
+pod/myapp-759b776bd7-jb7b6   1/1     Running   0          83s
+
+NAME            TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)   AGE
+service/myapp   ClusterIP   10.96.62.16   <none>        80/TCP    83s
+/health in pr-42: OK v0.2
+NAME    STATUS   AGE   OWNER    EXPIRES
+pr-43   Active   40s   team-a   2026-11-19
+NAME                    READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/myapp   1/1     1            1           40s
+
+NAME                         READY   STATUS    RESTARTS   AGE
+pod/myapp-759b776bd7-bmh25   1/1     Running   0          40s
+
+NAME            TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)   AGE
+service/myapp   ClusterIP   10.96.93.48   <none>        80/TCP    40s
+/health in pr-43: OK v0.2
+~~~
+
+After Terraform destroyed preview 42, the namespace query with
+--ignore-not-found -o name returned no output. Preview 43 still had its
+Deployment, running Pod and Service:
+
+~~~text
+NAME                    READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/myapp   1/1     1            1           95s
+
+NAME                         READY   STATUS    RESTARTS   AGE
+pod/myapp-759b776bd7-bmh25   1/1     Running   0          95s
+
+NAME            TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)   AGE
+service/myapp   ClusterIP   10.96.93.48   <none>        80/TCP    95s
+~~~
