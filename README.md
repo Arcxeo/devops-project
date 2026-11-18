@@ -200,3 +200,14 @@ State maps Terraform resources to real infrastructure and can contain secrets,
 resource identifiers and internal endpoints. Git preserves old copies and does
 not provide Terraform state locking. A team can use a backend with restricted
 access, encryption and locking to share state safely.
+
+## Part 2 - Variables, Outputs and Modules
+
+### 3. What are the advantages of one folder and one state per environment compared to workspaces?
+
+Each environment has an explicit root, input file and state boundary. The
+directory passed to Terraform determines which environment is affected, which
+makes CI targets and reviews easier to follow. Each root can also use its own
+backend and access controls. CLI workspaces share a root configuration and
+backend configuration, and selecting the wrong workspace can target the wrong
+state.
