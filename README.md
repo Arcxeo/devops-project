@@ -182,3 +182,21 @@ Question 7. Starting from a Pod running in production, how can you find the comm
 
 Question 8. Why is manual `kubectl edit` in production a traceability risk?
 > A manual edit changes the cluster without changing the files in Git. There is no Pull Request, review or CI run explaining the change, and the next deployment can overwrite it. Using manifests through the normal Git workflow leaves a history of who changed what and why.
+
+# Session 3: Terraform, Environments and Ephemeral Previews
+
+## Part 1 - First Terraform Configuration
+
+### 1. What did Terraform propose after you deleted the container by hand? What is this situation called?
+
+Terraform detects that the container recorded in state is missing from Docker.
+The next normal plan proposes creating the container again because it is still
+declared in the configuration. This difference between the declared
+configuration and the real infrastructure is called drift.
+
+### 2. Why should the state file never be committed to Git?
+
+State maps Terraform resources to real infrastructure and can contain secrets,
+resource identifiers and internal endpoints. Git preserves old copies and does
+not provide Terraform state locking. A team can use a backend with restricted
+access, encryption and locking to share state safely.
