@@ -7,16 +7,17 @@
 - Nicolas Papleux
 - Romain Dangin
 
-We used some IA to guide us for the labs.
+We used AI as a guide during the labs.
 
-# Session 1: Git, CI/CD and Docker
+## Session 1: Git, CI/CD and Docker
 
-## Part 1 - Git repository and branching workflow
+### Part 1 - Git repository and branching workflow
 
-Question 1. Why forbid direct pushes to `main`?
-> A direct push skips the Pull Request review and its checks. If the commit is broken, `main` is broken too. With a protected branch, changes have to pass the tests and be reviewed before they are merged.
+#### 1. Why forbid direct pushes to `main`?
 
-## Part 2 - Containerization
+Pull requests give someone else a chance to review the change and let CI run before it reaches `main`. A direct push can put a broken commit on the shared branch straight away.
+
+### Part 2 - Containerization
 
 Commands used to build and run the application:
 
@@ -41,27 +42,31 @@ Cleanup command:
 docker rm -f myapp
 ```
 
-Question 2. What is the difference between an image and a container?
-> An image is like a cake recipe: it contains everything needed to create the application environment. A container is the cake made from that recipe. The image does not change, while the running container has its own processes and writable data.
+#### 2. What is the difference between an image and a container?
 
-Question 3. Compare the size of your image with a non-slim base image. What do you observe?
-> On our machine, the Alpine image was about 252 MB. The same application built with `node:24` was 1.64 GB, around 6.5 times larger. Alpine contains fewer system packages, which explains most of the difference. The exact size can change depending on the Docker version and the computer.
+The image contains the application, its dependencies and the default command. A container is an instance of that image, with its own processes and a writable layer. We can start several containers from the same image.
 
-## Part 3 - CI pipeline
+#### 3. Compare the size of your image with a non-slim base image. What do you observe?
+
+Our Alpine build was about 252 MB. The build with `node:24` was 1.64 GB, roughly six and a half times larger. The standard base includes more system packages.
+
+### Part 3 - CI pipeline
 
 Our GitHub Actions workflow runs `npm ci`, the linter, the tests and the Docker build on each Pull Request. A push to `main` also publishes the image to GitHub Container Registry.
 
-Question 4. Why tag the image with the commit SHA rather than `latest`?
-> A SHA points to one exact commit. If an image fails in production, we can find the source code and the pipeline run that built it. The `latest` tag can move each time a new image is published, so it does not give us that traceability.
+#### 4. Why tag the image with the commit SHA rather than `latest`?
 
-Question 5. What does "fail fast" mean in a pipeline?
-> It means running the quick checks first and stopping as soon as one fails. For example, if the tests fail, there is no reason to continue with the Docker build or publish the image.
+The commit SHA tells us which revision an image was built from. If something breaks, we can go back to that commit and its CI run. `latest` can point at a different build by then.
 
-# Session 2: Kubernetes, Multi-environment Deployment and Audit
+#### 5. What does "fail fast" mean in a pipeline?
 
-## Part 1 - Local cluster setup
+Run the quick checks first and stop when one fails. If the tests are red, we can skip the Docker build and fix the tests.
 
-We created a local cluster named `devops-lab` with kind. The current context is `kind-devops-lab`, the control-plane node is `Ready`, and the `dev`, `staging` and `prod` namespaces are active.
+## Session 2: Kubernetes, Multi-environment Deployment and Audit
+
+### Part 1 - Local cluster setup
+
+We created a local cluster named `devops-lab` with kind. We checked that the control-plane node was ready and that the three namespaces were active in the `kind-devops-lab` context.
 
 Useful checks:
 
@@ -72,12 +77,11 @@ kubectl get nodes --context kind-devops-lab
 kubectl get namespace dev staging prod --context kind-devops-lab
 ```
 
-Question 1. What is the role of a namespace? Does it provide strong security isolation by itself?
-> A namespace separates resources inside the same cluster. We use one namespace for each environment so that, for example, the `dev` Pods and Services do not get mixed with the ones in `prod`.
->
-> A namespace alone is not a strong security boundary. The namespaces still use the same cluster and nodes, and network traffic is allowed by default. We would also need RBAC and NetworkPolicies. For workloads that must be completely separated, using different clusters is safer.
+#### 1. What is the role of a namespace? Does it provide strong security isolation by itself?
 
-## Part 2 - First deployment
+We used `dev`, `staging` and `prod` to keep each environment's Pods and Services separate. They still share a cluster, and Pods can usually reach each other under the default network setup. RBAC controls API access and NetworkPolicies can restrict traffic between workloads.
+
+### Part 2 - First deployment
 
 The Kubernetes manifests are in `k8s/base/`. The Deployment starts three copies of `myapp:0.1`, and the Service exposes them on port 80 inside the cluster.
 
@@ -91,20 +95,23 @@ kubectl port-forward svc/myapp 8080:80 -n dev
 curl http://localhost:8080/health
 ```
 
-Question 2. Why does Kubernetes recreate the deleted Pod? Which component is responsible?
-> The Deployment says that three replicas must be running. When a Pod is deleted, the ReplicaSet sees that only two are left and creates a replacement. The ReplicaSet controller, running in `kube-controller-manager`, handles this reconciliation. The new Pod has a different name because it is a new object.
+#### 2. Why does Kubernetes recreate the deleted Pod? Which component is responsible?
 
-## Part 3 - Probes, resources and configuration
+The Deployment asks for three replicas. After we delete a Pod, the ReplicaSet controller sees only two and starts a replacement. The replacement gets its own name.
+
+### Part 3 - Probes, resources and configuration
 
 The Deployment now checks `/health` with readiness and liveness probes. It also defines CPU and memory requests and limits. `APP_ENV` comes from `myapp-config`, while the fake `API_KEY` comes from `myapp-secret`.
 
-Question 3. What is the difference between a readiness and a liveness probe? What happens to traffic when readiness fails?
-> Readiness tells Kubernetes whether a Pod can receive traffic. When it fails, the Pod keeps running but the Service removes it from its endpoints. Liveness checks whether the application is stuck or unhealthy. When liveness fails several times, Kubernetes restarts the container.
+#### 3. What is the difference between a readiness and a liveness probe? What happens to traffic when readiness fails?
 
-Question 4. Is a Kubernetes Secret encrypted by default? How would you improve this?
-> No. The value stored in a Secret manifest is only base64-encoded, not encrypted. Secrets can also be stored unencrypted in etcd unless encryption at rest is configured. We would enable etcd encryption, restrict access with RBAC and, for a real production setup, use an external secret manager instead of keeping secret values in Git.
+Readiness controls whether the Pod receives traffic from the Service. If the check fails, the Pod stays up but stops receiving that traffic. Repeated liveness failures cause the kubelet to restart the container.
 
-## Part 4 - Multiple environments with Kustomize
+#### 4. Is a Kubernetes Secret encrypted by default? How would you improve this?
+
+Values in the `data` field are base64-encoded, which anyone who can read them can decode. We would enable encryption at rest for etcd, restrict access with RBAC and keep real credentials in a secret manager.
+
+### Part 4 - Multiple environments with Kustomize
 
 The files in `k8s/base/` contain the common configuration. Each folder in `k8s/overlays/` changes the namespace, the `env` label, `APP_ENV` and the replica count. We use one replica in `dev`, three in `staging` and five in `prod`.
 
@@ -120,12 +127,11 @@ kubectl apply -k k8s/overlays/prod
 kubectl get deployment -A -l app=myapp
 ```
 
-Question 5. How does this pattern help with hybrid or multi-cloud deployments? What would differ between a real on-prem cluster and a cloud cluster?
-> The base keeps the application configuration the same everywhere, while each overlay contains only the changes needed for one target. This avoids maintaining three copies of the same Deployment and Service.
->
-> In a real setup, the overlays could select different StorageClasses, ingress settings or cloud load balancers. An on-prem cluster would use the storage, network and registry available in the local infrastructure, while a cloud cluster would usually use services provided by that cloud. Credentials and cluster access would also be managed separately.
+#### 5. How does this pattern help with hybrid or multi-cloud deployments? What would differ between a real on-prem cluster and a cloud cluster?
 
-## Part 5 - Rolling update and rollback
+We can share the Deployment and Service and keep each environment's differences in its overlay. A cloud overlay might use a managed load balancer and storage class. An on-prem overlay would use the ingress and storage available in that cluster.
+
+### Part 5 - Rolling update and rollback
 
 For version `0.2`, `/health` returns `OK v0.2`. We built the new image, loaded it into kind and changed the `dev` overlay from `myapp:0.1` to `myapp:0.2`. Requests continued to succeed while Kubernetes replaced the Pod.
 
@@ -142,10 +148,11 @@ kubectl rollout history deployment/myapp -n dev
 kubectl rollout undo deployment/myapp -n dev
 ```
 
-Question 6. Why did the broken rollout not take down the application?
-> The Deployment uses the `RollingUpdate` strategy. Kubernetes waits for the new Pod to become ready before removing the old one. The Pod using the broken image never became ready, so the existing `0.2` Pod stayed in the Service and kept answering requests. Kubernetes did not fix the bad image automatically; we still had to roll back the Deployment.
+#### 6. Why did the broken rollout not take down the application?
 
-## Part 6 - Audit and traceability
+The new Pod could never pull `myapp:broken`, so it never became ready. The rolling update kept the old `0.2` Pod serving requests. We still had to run `kubectl rollout undo` to restore the Deployment.
+
+### Part 6 - Audit and traceability
 
 The `prod` Deployment has annotations for the Git commit, the GitHub Actions run, the owner and the ticket. The RBAC manifests in `k8s/rbac/` create a `viewer` ServiceAccount that can only read Pods in `dev`.
 
@@ -177,82 +184,60 @@ owner: team-a
 ticket: OPS-123
 ```
 
-Question 7. Starting from a Pod running in production, how can you find the commit, the reviewer and the pipeline run that produced it?
-> First, follow the Pod's `ownerReferences` to its ReplicaSet, then from the ReplicaSet to the Deployment. The Deployment annotations give us the commit SHA and the pipeline URL. We can open that commit on GitHub, find its Pull Request and check the review section to see who approved it.
+#### 7. Starting from a Pod running in production, how can you find the commit, the reviewer and the pipeline run that produced it?
 
-Question 8. Why is manual `kubectl edit` in production a traceability risk?
-> A manual edit changes the cluster without changing the files in Git. There is no Pull Request, review or CI run explaining the change, and the next deployment can overwrite it. Using manifests through the normal Git workflow leaves a history of who changed what and why.
+Follow `ownerReferences` from the Pod to its ReplicaSet and then to the Deployment. The Deployment annotations give us the commit and the Actions run. From the commit on GitHub, we can open the PR and look up who reviewed it.
 
-# Session 3: Terraform, Environments and Ephemeral Previews
+#### 8. Why is manual `kubectl edit` in production a traceability risk?
 
-## Part 1 - First Terraform Configuration
+`kubectl edit` updates the cluster immediately, so the diff never goes through Git, review or CI. The next deployment can overwrite it, and the team may struggle to explain when or why it changed.
 
-### 1. What did Terraform propose after you deleted the container by hand? What is this situation called?
+## Session 3: Terraform, Environments and Ephemeral Previews
 
-Terraform detects that the container recorded in state is missing from Docker.
-The next normal plan proposes creating the container again because it is still
-declared in the configuration. This difference between the declared
-configuration and the real infrastructure is called drift.
+See the [Terraform lab notes](infra/README.md) for the commands and test output.
 
-### 2. Why should the state file never be committed to Git?
+### Part 1 - First Terraform Configuration
 
-State maps Terraform resources to real infrastructure and can contain secrets,
-resource identifiers and internal endpoints. Git preserves old copies and does
-not provide Terraform state locking. A team can use a backend with restricted
-access, encryption and locking to share state safely.
+#### 1. What did Terraform propose after you deleted the container by hand? What is this situation called?
 
-## Part 2 - Variables, Outputs and Modules
+After we deleted `tf-web`, Terraform's next plan proposed creating it again on port `8082`. The configuration still declared the container, but Docker no longer had it. That's drift.
 
-### 3. What are the advantages of one folder and one state per environment compared to workspaces?
+#### 2. Why should the state file never be committed to Git?
 
-Each environment has an explicit root, input file and state boundary. The
-directory passed to Terraform determines which environment is affected, which
-makes CI targets and reviews easier to follow. Each root can also use its own
-backend and access controls. CLI workspaces share a root configuration and
-backend configuration, and selecting the wrong workspace can target the wrong
-state.
+State can include passwords, internal addresses and resource IDs. If it gets into Git, removing the file in a later commit leaves the earlier copy in history. A shared backend can restrict access, encrypt state and lock it during updates.
 
-## Part 3 - State Management
+### Part 2 - Variables, Outputs and Modules
 
-### 4. Why is a remote backend with locking essential for a team? Which problems does it prevent?
+#### 3. What are the advantages of one folder and one state per environment compared to workspaces?
 
-A team can work from one authoritative state. Locking serializes operations
-that would otherwise race and could overwrite each other's updates, corrupt
-the state or leave resources unmanaged. The shared local path in this exercise
-simulates central storage. For team use, choose a remote backend that provides
-locking, access control and recovery of previous versions.
+For this lab we ran Terraform in `infra/envs/dev` or `infra/envs/staging`, so the command itself made the target clear. Each directory can have its own variables, backend and permissions. With CLI workspaces, both environments share a configuration and the selected workspace decides which state Terraform opens.
 
-### 5. What information in a state file can be sensitive?
+### Part 3 - State Management
 
-Provider-managed resource attributes can include passwords, API tokens,
-connection strings, private addresses and identifiers. Terraform's sensitive
-flag masks values in normal terminal output, but the values can still exist
-in state and saved plan files.
+#### 4. Why is a remote backend with locking essential for a team? Which problems does it prevent?
 
-## Part 4 - Ephemeral Environment per Pull Request
+Everyone needs to work from the same state. The lock stops two operations from writing it at once and losing each other's changes. We used a shared local path for the exercise. In a team we'd use a remote backend with locking and version history.
 
-### 6. What could go wrong if the preview environment is never destroyed? List three mitigations.
+#### 5. What information in a state file can be sensitive?
 
-A stale preview consumes cluster capacity, can expose an outdated build and
-can leave resources behind after the PR no longer needs them. Three
-mitigations are:
+Passwords, API tokens and connection strings can end up in state, along with private addresses and resource IDs. Terraform can hide a sensitive value in the terminal while still storing it in state or a saved plan.
 
-1. Trigger destruction when a PR closes or merges.
-2. Set an expiration label and run a scheduled cleanup for expired namespaces.
-3. Give each preview an owner and enforce resource quotas to limit its impact.
+### Part 4 - Ephemeral Environment per Pull Request
 
-## Part 5 - Terraform in CI with Security Scanning
+#### 6. What could go wrong if the preview environment is never destroyed? List three mitigations.
 
-### 7. Why run plan on a Pull Request but apply only after merge?
+An old preview keeps using cluster resources and can leave an outdated build reachable. We'd handle it in three ways.
 
-A plan gives reviewers a preview of additions, updates and deletions. The
-PR workflow can validate proposed infrastructure using an ephemeral runner.
-Applying after merge lets the deployment workflow use the approved commit
-and enforce environment protections before it changes shared infrastructure.
+1. Destroy the preview when the PR closes or merges.
+2. Give it an expiry date and schedule a job to clean up expired namespaces.
+3. Assign an owner and use resource quotas to limit what each preview can consume.
 
-### 8. Why should a CI pipeline use short-lived credentials (OIDC) rather than long-lived access keys?
+### Part 5 - Terraform in CI with Security Scanning
 
-OIDC allows a job to exchange its workload identity for time-limited access.
-The trust policy can constrain the repository, branch or environment and the
-role can enforce least privilege. An exposed credential has a limited window
-of use, and the pipeline needs no permanent access key stored as a secret.
+#### 7. Why run plan on a Pull Request but apply only after merge?
+
+A plan lets reviewers see what Terraform would add, change or delete before anything happens to the shared environment. An apply after merge uses the approved revision and can go through the deployment environment's approval rules.
+
+#### 8. Why should a CI pipeline use short-lived credentials (OIDC) rather than long-lived access keys?
+
+With OIDC, a job exchanges its identity for credentials that expire. We can limit which repository, branch or environment can request them and what they can do. There is no permanent access key to store in the repository's secrets.
