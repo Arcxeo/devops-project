@@ -162,3 +162,14 @@ pod/myapp-759b776bd7-bmh25   1/1     Running   0          95s
 NAME            TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)   AGE
 service/myapp   ClusterIP   10.96.93.48   <none>        80/TCP    95s
 ~~~
+
+## Terraform CI
+
+The PR workflow checks formatting and validates each Terraform root. It also
+uploads a textual dev plan from the ephemeral GitHub runner and checks the
+Terraform files with Trivy for high and critical findings.
+
+To reproduce the failing scan on the lab PR, apply the **lab3-scan-demo**
+label. The security job writes an intentionally unsafe Terraform fixture only
+in its temporary checkout. Remove the label to rerun the scan against the
+committed configuration.

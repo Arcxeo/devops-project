@@ -1,0 +1,69 @@
+name: Terraform
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/terraform.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.11.4
+          terraform_wrapper: false
+      - name: Check formatting and validate each root
+        run: |
+          terraform fmt -check -recursive infra
+          for root in quickstart envs/dev envs/staging preview; do
+            terraform -chdir="infra/$root" init -backend=false -input=false -lockfile=readonly
+            terraform -chdir="infra/$root" validate -no-color
+          done
+      - name: Generate a plan for dev on the ephemeral runner
+        run: |
+          set -o pipefail
+          terraform -chdir=infra/envs/dev init -input=false -lockfile=readonly
+          terraform -chdir=infra/envs/dev plan -input=false -no-color -var-file=dev.tfvars | tee terraform-plan.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terraform-dev-plan
+          path: terraform-plan.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Add an intentionally insecure fixture for the lab demonstration
+        if: contains(github.event.pull_request.labels.*.name, 'lab3-scan-demo')
+        run: |
+          mkdir -p infra/scan-demo
+          cat > infra/scan-demo/main.tf <<'EOF'
+          resource "aws_security_group" "insecure_demo" {
+            ingress {
+              from_port   = 22
+              to_port     = 22
+              protocol    = "tcp"
+              cidr_blocks = ["0.0.0.0/0"]
+            }
+          }
+          EOF
+      - name: Scan Terraform for high and critical misconfigurations
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: infra
+          severity: HIGH,CRITICAL
+          exit-code: '1'
