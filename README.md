@@ -211,3 +211,20 @@ makes CI targets and reviews easier to follow. Each root can also use its own
 backend and access controls. CLI workspaces share a root configuration and
 backend configuration, and selecting the wrong workspace can target the wrong
 state.
+
+## Part 3 - State Management
+
+### 4. Why is a remote backend with locking essential for a team? Which problems does it prevent?
+
+A team can work from one authoritative state. Locking serializes operations
+that would otherwise race and could overwrite each other's updates, corrupt
+the state or leave resources unmanaged. The shared local path in this exercise
+simulates central storage. For team use, choose a remote backend that provides
+locking, access control and recovery of previous versions.
+
+### 5. What information in a state file can be sensitive?
+
+Provider-managed resource attributes can include passwords, API tokens,
+connection strings, private addresses and identifiers. Terraform's sensitive
+flag masks values in normal terminal output, but the values can still exist
+in state and saved plan files.
