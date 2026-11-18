@@ -240,3 +240,19 @@ mitigations are:
 1. Trigger destruction when a PR closes or merges.
 2. Set an expiration label and run a scheduled cleanup for expired namespaces.
 3. Give each preview an owner and enforce resource quotas to limit its impact.
+
+## Part 5 - Terraform in CI with Security Scanning
+
+### 7. Why run plan on a Pull Request but apply only after merge?
+
+A plan gives reviewers a preview of additions, updates and deletions. The
+PR workflow can validate proposed infrastructure using an ephemeral runner.
+Applying after merge lets the deployment workflow use the approved commit
+and enforce environment protections before it changes shared infrastructure.
+
+### 8. Why should a CI pipeline use short-lived credentials (OIDC) rather than long-lived access keys?
+
+OIDC allows a job to exchange its workload identity for time-limited access.
+The trust policy can constrain the repository, branch or environment and the
+role can enforce least privilege. An exposed credential has a limited window
+of use, and the pipeline needs no permanent access key stored as a secret.
