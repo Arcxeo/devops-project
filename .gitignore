@@ -5,3 +5,7 @@ node_modules/
 coverage/
 *.log
 /kubectl.exe
+
+# Terraform local data
+.terraform/
+*.tfstate*
