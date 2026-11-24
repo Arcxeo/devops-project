@@ -274,3 +274,31 @@ Prometheus stores one time series per combination of label values, so each new I
 #### 2. Why log to stdout in JSON rather than to a file in plain text?
 
 A file inside the container is lost with the Pod. With stdout, Kubernetes collects the output, `kubectl logs` can show it and an agent can send it to a central store. JSON fields such as `status` or `level` can be filtered directly, without parsing free text.
+
+### Part 2 - Deploy the Monitoring Stack
+
+We installed the `kube-prometheus-stack` Helm chart in the `monitoring` namespace of the `devops-lab` kind cluster. All six Pods became ready: Prometheus, Alertmanager, Grafana, the operator, kube-state-metrics and the node exporter.
+
+```sh
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+kubectl create namespace monitoring
+helm install monitoring prometheus-community/kube-prometheus-stack -n monitoring
+kubectl get pods -n monitoring
+kubectl get secret monitoring-grafana -n monitoring -o jsonpath='{.data.admin-password}' | base64 -d
+kubectl port-forward -n monitoring svc/monitoring-grafana 3001:80
+kubectl port-forward -n monitoring svc/monitoring-kube-prometheus-prometheus 9090:9090
+```
+
+The Grafana password comes from the `monitoring-grafana` Secret, for the user `admin`. Grafana comes with 29 dashboards and Prometheus as a data source.
+
+The Prometheus `Targets` page showed 14 targets up and 4 down:
+
+```text
+down  kube-controller-manager  172.22.0.2:10257  connection refused
+down  kube-etcd                172.22.0.2:2381   connection refused
+down  kube-proxy               172.22.0.2:10249  connection refused
+down  kube-scheduler           172.22.0.2:10259  connection refused
+```
+
+By default, these components serve their metrics on `127.0.0.1` inside the node, so Prometheus can't reach them from its Pod. They work normally, but the related alerts, such as `TargetDown`, are noise on this cluster.
