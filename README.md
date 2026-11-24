@@ -302,3 +302,33 @@ down  kube-scheduler           172.22.0.2:10259  connection refused
 ```
 
 By default, these components serve their metrics on `127.0.0.1` inside the node, so Prometheus can't reach them from its Pod. They work normally, but the related alerts, such as `TargetDown`, are noise on this cluster.
+
+### Part 3 - Scrape Your Application
+
+The `ServiceMonitor` is in `monitoring/servicemonitor.yaml`. The Service already had a port named `http` and the label `app: myapp`, so we left it unchanged. We set the `dev` overlay to the instrumented image, tagged with its commit SHA.
+
+```sh
+kind load docker-image myapp:ae4469be4ebbd63d6044592d17f19d9bc9db4c08 --name devops-lab
+kubectl apply -k k8s/overlays/dev
+kubectl apply -f monitoring/servicemonitor.yaml
+kubectl port-forward -n dev svc/myapp 8080:80
+```
+
+The target `serviceMonitor/monitoring/myapp/0` is `UP` in Prometheus. We ran the traffic loop for about two minutes, which made 73 iterations, then queried `http_requests_total`:
+
+```text
+route="/health"    status="200"  81
+route="/metrics"   status="200"  16
+route="unmatched"  status="404"  73
+route="/slow"      status="200"  73
+route="/error"     status="200"  45
+route="/error"     status="500"  28
+```
+
+The loop also calls `/`, which the application doesn't define, hence the 404 responses. The `/health` requests come from the Kubernetes probes and the `/metrics` requests from Prometheus.
+
+#### 3. The target does not appear. List three things you would check.
+
+1. The `ServiceMonitor` has the label `release: monitoring`. The Prometheus from this chart ignores the ones without it.
+2. `namespaceSelector` and `selector.matchLabels` match the namespace and the labels of the Service itself, not those of the Pods.
+3. The `port` in the `ServiceMonitor` matches the port name in the Service (`http`), and `kubectl get endpointslices -n dev` lists a Pod behind the Service.
