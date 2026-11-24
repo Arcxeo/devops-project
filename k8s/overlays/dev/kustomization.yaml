@@ -12,7 +12,7 @@ replicas:
 
 images:
   - name: myapp
-    newTag: "0.2"
+    newTag: "ae4469be4ebbd63d6044592d17f19d9bc9db4c08"
 
 labels:
   - pairs:
