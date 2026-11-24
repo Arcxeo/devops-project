@@ -241,3 +241,36 @@ A plan lets reviewers see what Terraform would add, change or delete before anyt
 #### 8. Why should a CI pipeline use short-lived credentials (OIDC) rather than long-lived access keys?
 
 With OIDC, a job exchanges its identity for credentials that expire. We can limit which repository, branch or environment can request them and what they can do. There is no permanent access key to store in the repository's secrets.
+
+## Session 4: Observability, Alerting and Incident Response
+
+### Part 1 - Instrument the Application
+
+The application now exposes Prometheus metrics on `/metrics` and writes one JSON log line per request to stdout. We added two test endpoints: `/slow` waits for a random time up to 2 seconds, and `/error` returns HTTP 500 about 30% of the time.
+
+Commands used to test and build it:
+
+```sh
+npm ci
+node app.js
+curl localhost:3000/slow
+curl localhost:3000/error
+curl localhost:3000/metrics
+docker build -t myapp:$(git rev-parse HEAD) .
+```
+
+Over 200 local calls to `/error`, we got 70 HTTP 500 responses (35%). The counters in `/metrics` matched the calls:
+
+```text
+http_requests_total{method="GET",route="/slow",status="200"} 8
+http_requests_total{method="GET",route="/error",status="500"} 70
+http_requests_total{method="GET",route="/error",status="200"} 130
+```
+
+#### 1. Why is it a problem to use a user ID or a full URL containing IDs as a metric label?
+
+Prometheus stores one time series per combination of label values, so each new ID creates more series, multiplied by the number of buckets for a histogram. Memory use grows and queries slow down. We use the Express route pattern as the label, with `unmatched` for unknown paths, and keep the real path in the logs.
+
+#### 2. Why log to stdout in JSON rather than to a file in plain text?
+
+A file inside the container is lost with the Pod. With stdout, Kubernetes collects the output, `kubectl logs` can show it and an agent can send it to a central store. JSON fields such as `status` or `level` can be filtered directly, without parsing free text.

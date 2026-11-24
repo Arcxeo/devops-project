@@ -15,3 +15,9 @@ coverage/
 *.tfvars.json
 !/infra/envs/dev/dev.tfvars
 !/infra/envs/staging/staging.tfvars
+
+# Labs
+devops-Lab1.pdf
+devops-Lab2.pdf
+devops-Lab3.pdf
+devops-Lab4.pdf
