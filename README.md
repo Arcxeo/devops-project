@@ -395,3 +395,41 @@ The loop from Part 3 gives an error ratio close to 10%, because a third of its c
 #### 5. What is alert fatigue and how do the `for:` clause and severity labels help?
 
 Alert fatigue is when a team gets so many alerts, many of them useless, that it starts ignoring them and can miss a real one. With `for: 2m`, a short spike stays `pending` and notifies no one. The `severity` label lets Alertmanager page someone for `critical` alerts and send the `warning` ones to a chat channel or a ticket. Our cluster shows the problem: the alerts on the kind components that Prometheus can't reach are always firing.
+
+### Part 6 - Incident Simulation and Postmortem
+
+The incident was simulated with Claude Code, which played both the saboteur and the responder. The faulty image `myapp:0.4` adds a 1-second timeout to `/slow`, so about half of the calls to this route return HTTP 503, while `/health` keeps answering 200. The full timeline is in [docs/postmortem.md](docs/postmortem.md).
+
+```sh
+# saboteur
+kubectl set image deployment/myapp myapp=myapp:0.4 -n dev
+# responder
+kubectl rollout history deployment/myapp -n dev
+kubectl logs -n dev -l app=myapp --tail=200
+kubectl rollout undo deployment/myapp -n dev
+```
+
+```text
+10:50:29  deployment of myapp:0.4
+10:52:04  HighErrorRate pending
+10:54:04  HighErrorRate firing, 26% of 5xx responses
+10:55:06  rollback
+10:57:38  alert resolved
+```
+
+![Dashboard during the incident](docs/screenshots/incident-dashboard.png)
+
+We also found that the application ignores `SIGTERM`: a replaced Pod keeps serving its open connections until Kubernetes kills it 30 seconds later. It should be fixed.
+
+#### 6. Why mitigate before finding the root cause?
+
+Users are affected as long as the incident lasts, and finding the cause can take hours. A rollback took us 7 seconds and only required knowing that the errors started after a deployment. The metrics and logs are still there afterwards to investigate without pressure.
+
+#### 7. Why must a postmortem be blameless? Give an example of a blameless rewording of "Alex deployed a bad version".
+
+If people fear being blamed, they hide details, and the team can't fix what allowed the incident. A person's mistake is usually possible because of a gap in the process. Instead of "Alex deployed a bad version", we would write: "A version with a 1-second timeout on `/slow` was deployed to `dev`. No test or smoke test covered this route, so the pipeline could not detect the problem."
+
+#### 8. Propose two concrete changes to the pipeline from Sessions 1 to 3 that would have prevented or limited this incident.
+
+1. Smoke test: after the deployment to `dev`, the pipeline calls `/slow` 20 times and rolls back if any response is a 5xx. With half of the calls failing, it would have caught this version within seconds.
+2. Canary release: the new version first receives a small share of the traffic, for example 10%, and the rollout stops if its error ratio is above the threshold. About 3% of the requests would have failed instead of 25%. A canary needs more than one replica and a tool such as Argo Rollouts.

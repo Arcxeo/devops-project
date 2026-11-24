@@ -63,6 +63,8 @@ Restore the service first and look for the root cause afterwards.
    kubectl rollout status deployment/myapp -n dev
    ```
 
+   The faulty Pod can keep answering on open connections for up to 30 seconds, because the application does not handle `SIGTERM`.
+
 2. No recent deployment and only some Pods fail: restart them.
 
    ```sh
