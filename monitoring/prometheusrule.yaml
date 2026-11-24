@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: myapp-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: myapp
+      rules:
+        - alert: HighErrorRate
+          expr: |
+            sum(rate(http_requests_total{namespace="dev", route!~"/health|/metrics", status=~"5.."}[2m]))
+              / sum(rate(http_requests_total{namespace="dev", route!~"/health|/metrics"}[2m])) > 0.10
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Error rate above 10%"
+            description: "{{ $value | humanizePercentage }} of the requests to myapp in dev return a 5xx response."
+            runbook: "https://github.com/Arcxeo/devops-project/blob/main/docs/runbook.md"
